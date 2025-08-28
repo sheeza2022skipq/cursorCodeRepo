@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Minimal Chatbot</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <main class="page">
+      <section class="chat-container" role="region" aria-label="Chatbot">
+        <header class="chat-header">
+          <h1 class="chat-title">Chatbot</h1>
+        </header>
+
+        <div id="chat-messages" class="chat-messages" aria-live="polite" aria-relevant="additions"></div>
+
+        <form id="chat-form" class="chat-input" autocomplete="off">
+          <input
+            id="user-input"
+            name="message"
+            type="text"
+            inputmode="text"
+            placeholder="Type your message..."
+            aria-label="Type your message"
+            required
+          />
+          <button id="send-btn" type="submit" title="Send">Send</button>
+        </form>
+      </section>
+    </main>
+
+    <script>
+      const messagesEl = document.getElementById('chat-messages');
+      const formEl = document.getElementById('chat-form');
+      const inputEl = document.getElementById('user-input');
+      const sendBtn = document.getElementById('send-btn');
+
+      function appendMessage(text, author = 'bot') {
+        const wrapper = document.createElement('div');
+        wrapper.className = `message ${author}`;
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble';
+        bubble.textContent = text;
+        wrapper.appendChild(bubble);
+        messagesEl.appendChild(wrapper);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      function setSending(isSending) {
+        sendBtn.disabled = isSending;
+        inputEl.disabled = isSending;
+      }
+
+      async function sendMessage(text) {
+        setSending(true);
+        appendMessage(text, 'user');
+        const typingId = `typing-${Date.now()}`;
+        const typingEl = document.createElement('div');
+        typingEl.className = 'message bot typing';
+        typingEl.id = typingId;
+        typingEl.innerHTML = '<div class="bubble">Typing…</div>';
+        messagesEl.appendChild(typingEl);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+
+        try {
+          const response = await fetch('/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: text })
+          });
+
+          if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || `Request failed (${response.status})`);
+          }
+
+          const data = await response.json();
+          typingEl.remove();
+          appendMessage(data.reply || 'No reply', 'bot');
+        } catch (err) {
+          typingEl.remove();
+          appendMessage(`Error: ${err.message || err}`, 'bot');
+        } finally {
+          setSending(false);
+        }
+      }
+
+      formEl.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const text = inputEl.value.trim();
+        if (!text) return;
+        inputEl.value = '';
+        sendMessage(text);
+      });
+
+      // Focus input on load
+      window.addEventListener('load', () => inputEl.focus());
+    </script>
+  </body>
+  </html>
+
